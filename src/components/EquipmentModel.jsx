@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
 import {
   createFrontFasciaTexture,
   createBladePlateTexture,
@@ -462,6 +463,9 @@ function MicroUsbPort({ id, position, isHovered, isSelected, onHover, onUnhover,
   );
 }
 
+// Pre-allocated Float32Array for 8 leader lines (8 lines * 2 vertices * 3 coords = 48)
+const INITIAL_LINE_POSITIONS = new Float32Array(8 * 2 * 3);
+
 /**
  * Main 3D Model: Evertz SCORPION-4
  * Calibrated strictly to official documentation:
@@ -475,9 +479,24 @@ export default function EquipmentModel({
   onHover,
   onUnhover,
   onSelect,
-  wireframe = false
+  wireframe = false,
+  exploded = false
 }) {
   const groupRef = useRef();
+
+  // Subsystem Refs for Exploded View Decomposition
+  const heatsinkRef = useRef();
+  const bladeRef = useRef();
+  const vbRef = useRef();
+  const geRef = useRef();
+  const frontFasciaRef = useRef();
+  const rearRef = useRef();
+
+  // Technical Leader Lines References
+  const lineGeomRef = useRef();
+  const lineMatRef = useRef();
+  const lineSegmentsRef = useRef();
+  const animT = useRef(0);
 
   // Generate canvas textures once with useMemo
   const textures = useMemo(() => {
@@ -515,6 +534,84 @@ export default function EquipmentModel({
   // Helper to check hover or select state
   const isH = (id) => hoveredId === id;
   const isS = (id) => selectedId === id;
+
+  // Smooth Interactive Exploded Assembly Lerp / Damping
+  useFrame((_, delta) => {
+    const targetT = exploded ? 1 : 0;
+    // Critically damped spring towards target
+    animT.current = THREE.MathUtils.damp(animT.current, targetT, 5.5, delta);
+    if (Math.abs(animT.current - targetT) < 0.0005) {
+      animT.current = targetT;
+    }
+    const t = animT.current;
+
+    // 1. Upper Heatsink lifts upward (+Y)
+    if (heatsinkRef.current) {
+      heatsinkRef.current.position.y = 0.35 + 2.80 * t;
+    }
+
+    // 2. MIO-BLADE-Z21 slides forward (+Z) and slightly up (+Y)
+    if (bladeRef.current) {
+      bladeRef.current.position.set(2.45, -0.05 + 0.40 * t, halfD + 0.01 + 3.80 * t);
+    }
+
+    // 3. MIO-VB-2-12G slides forward (+Z), outward left (-X), and down (-Y)
+    if (vbRef.current) {
+      vbRef.current.position.set(1.55 - 0.45 * t, -0.80 - 0.25 * t, halfD + 0.01 + 2.80 * t);
+    }
+
+    // 4. MIO-GE-RJ45-IP slides forward (+Z), outward right (+X), and down (-Y)
+    if (geRef.current) {
+      geRef.current.position.set(3.37 + 0.45 * t, -0.80 - 0.25 * t, halfD + 0.01 + 2.80 * t);
+    }
+
+    // 5. Front Fascia & Power Connectors slide forward (+Z)
+    if (frontFasciaRef.current) {
+      frontFasciaRef.current.position.set(0, 0, 1.20 * t);
+    }
+
+    // 6. Rear Panel slides backward (-Z)
+    if (rearRef.current) {
+      rearRef.current.position.set(0, chassisCenterY, -halfD - 0.005 - 1.80 * t);
+    }
+
+    // 7. Update Technical Leader Lines
+    if (lineGeomRef.current) {
+      const p = lineGeomRef.current.attributes.position.array;
+      let idx = 0;
+      const setLine = (x0, y0, z0, x1, y1, z1) => {
+        p[idx++] = x0; p[idx++] = y0; p[idx++] = z0;
+        p[idx++] = x1; p[idx++] = y1; p[idx++] = z1;
+      };
+
+      // Heatsink Center Line
+      setLine(0, 0.35, 0,  0, 0.35 + 2.80 * t, 0);
+      // Heatsink Front-Left Corner Line
+      setLine(-3.6, 0.35, 2.3,  -3.6, 0.35 + 2.80 * t, 2.3);
+      // Heatsink Front-Right Corner Line
+      setLine(3.6, 0.35, 2.3,  3.6, 0.35 + 2.80 * t, 2.3);
+      // MIO-BLADE-Z21 Leader Line
+      setLine(2.45, -0.05, halfD + 0.01,  2.45, -0.05 + 0.40 * t, halfD + 0.01 + 3.80 * t);
+      // MIO-VB-2-12G Leader Line
+      setLine(1.55, -0.80, halfD + 0.01,  1.55 - 0.45 * t, -0.80 - 0.25 * t, halfD + 0.01 + 2.80 * t);
+      // MIO-GE-RJ45-IP Leader Line
+      setLine(3.37, -0.80, halfD + 0.01,  3.37 + 0.45 * t, -0.80 - 0.25 * t, halfD + 0.01 + 2.80 * t);
+      // Front Fascia Leader Line
+      setLine(-1.90, chassisCenterY, halfD + 0.005,  -1.90, chassisCenterY, halfD + 0.005 + 1.20 * t);
+      // Rear Panel Leader Line
+      setLine(0, chassisCenterY, -halfD - 0.005,  0, chassisCenterY, -halfD - 0.005 - 1.80 * t);
+
+      lineGeomRef.current.attributes.position.needsUpdate = true;
+    }
+
+    if (lineMatRef.current) {
+      lineMatRef.current.opacity = Math.max(0, Math.min(0.9, (t - 0.05) * 1.5));
+    }
+
+    if (lineSegmentsRef.current) {
+      lineSegmentsRef.current.visible = t > 0.02;
+    }
+  });
 
   return (
     <group ref={groupRef} dispose={null}>
@@ -577,9 +674,31 @@ export default function EquipmentModel({
       </group>
 
       {/* ============================================================== */}
+      {/* EXPLODED VIEW LEADER LINES & CHASSIS ANCHOR TERMINALS          */}
+      {/* ============================================================== */}
+      <lineSegments ref={lineSegmentsRef} frustumCulled={false} visible={false}>
+        <bufferGeometry ref={lineGeomRef}>
+          <bufferAttribute
+            attach="attributes-position"
+            count={16}
+            array={INITIAL_LINE_POSITIONS}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial
+          ref={lineMatRef}
+          color="#FFD500"
+          transparent
+          opacity={0}
+          depthWrite={false}
+        />
+      </lineSegments>
+
+      {/* ============================================================== */}
       {/* 2. UPPER CONVECTION COOLING HEATSINK WITH PARALLEL FINS        */}
       {/* ============================================================== */}
       <group
+        ref={heatsinkRef}
         position={[0, 0.35, 0]}
         onClick={(e) => { e.stopPropagation(); onSelect('chassis-heatsink'); }}
         onPointerOver={(e) => { e.stopPropagation(); onHover('chassis-heatsink', e); }}
@@ -668,88 +787,86 @@ export default function EquipmentModel({
       </group>
 
       {/* ============================================================== */}
-      {/* 3. FRONT MAIN CHASSIS FASCIA (LEFT PORTION WITH SILKSCREEN)    */}
+      {/* 3 & 4. FRONT CHASSIS FASCIA & CONNECTORS                       */}
       {/* ============================================================== */}
-      <group position={[-1.90, chassisCenterY, halfD + 0.005]}>
-        {/* Front Left Black Fascia Panel with Evertz & SCORPION-4 branding */}
-        <mesh>
-          <planeGeometry args={[4.70, chassisBodyHeight]} />
-          <meshStandardMaterial
-            map={textures.frontFascia}
-            metalness={0.8}
-            roughness={0.35}
-            wireframe={wireframe}
-          />
-        </mesh>
+      <group ref={frontFasciaRef}>
+        <group position={[-1.90, chassisCenterY, halfD + 0.005]}>
+          {/* Front Left Black Fascia Panel with Evertz & SCORPION-4 branding */}
+          <mesh>
+            <planeGeometry args={[4.70, chassisBodyHeight]} />
+            <meshStandardMaterial
+              map={textures.frontFascia}
+              metalness={0.8}
+              roughness={0.35}
+              wireframe={wireframe}
+            />
+          </mesh>
+        </group>
+
+        {/* 12VDC Power Connector 1 (Photo 1 Verified) */}
+        <PowerConnector
+          id="pwr-1"
+          position={[-2.50, -0.30, halfD + 0.01]}
+          isHovered={isH('pwr-1')}
+          isSelected={isS('pwr-1')}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onSelect={onSelect}
+        />
+
+        {/* Power 1 Status LED (Photo 1 Verified) */}
+        <LedIndicator
+          id="pwr-led-1"
+          position={[-2.05, -0.30, halfD + 0.01]}
+          color="#22c55e"
+          isHovered={isH('pwr-led-1')}
+          isSelected={isS('pwr-led-1')}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onSelect={onSelect}
+        />
+
+        {/* 12VDC Power Connector 2 (Redundant) (Photo 1 Verified) */}
+        <PowerConnector
+          id="pwr-2"
+          position={[-1.45, -0.30, halfD + 0.01]}
+          isHovered={isH('pwr-2')}
+          isSelected={isS('pwr-2')}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onSelect={onSelect}
+        />
+
+        {/* Power 2 Status LED (Photo 1 Verified) */}
+        <LedIndicator
+          id="pwr-led-2"
+          position={[-1.00, -0.30, halfD + 0.01]}
+          color="#22c55e"
+          isHovered={isH('pwr-led-2')}
+          isSelected={isS('pwr-led-2')}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onSelect={onSelect}
+        />
+
+        {/* REF IN BNC Connector with Hex Nut (Photo 1 Verified) */}
+        <BncConnector
+          id="ref-in"
+          position={[-0.15, -0.30, halfD + 0.01]}
+          rotation={[0, 0, 0]}
+          hasHexNut={true}
+          isHovered={isH('ref-in')}
+          isSelected={isS('ref-in')}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onSelect={onSelect}
+        />
       </group>
-
-      {/* ============================================================== */}
-      {/* 4. CHASSIS MOUNTED CONNECTORS (LEFT FRONT FASCIA)              */}
-      {/* ============================================================== */}
-
-      {/* 12VDC Power Connector 1 (Photo 1 Verified) */}
-      <PowerConnector
-        id="pwr-1"
-        position={[-2.50, -0.30, halfD + 0.01]}
-        isHovered={isH('pwr-1')}
-        isSelected={isS('pwr-1')}
-        onHover={onHover}
-        onUnhover={onUnhover}
-        onSelect={onSelect}
-      />
-
-      {/* Power 1 Status LED (Photo 1 Verified) */}
-      <LedIndicator
-        id="pwr-led-1"
-        position={[-2.05, -0.30, halfD + 0.01]}
-        color="#22c55e"
-        isHovered={isH('pwr-led-1')}
-        isSelected={isS('pwr-led-1')}
-        onHover={onHover}
-        onUnhover={onUnhover}
-        onSelect={onSelect}
-      />
-
-      {/* 12VDC Power Connector 2 (Redundant) (Photo 1 Verified) */}
-      <PowerConnector
-        id="pwr-2"
-        position={[-1.45, -0.30, halfD + 0.01]}
-        isHovered={isH('pwr-2')}
-        isSelected={isS('pwr-2')}
-        onHover={onHover}
-        onUnhover={onUnhover}
-        onSelect={onSelect}
-      />
-
-      {/* Power 2 Status LED (Photo 1 Verified) */}
-      <LedIndicator
-        id="pwr-led-2"
-        position={[-1.00, -0.30, halfD + 0.01]}
-        color="#22c55e"
-        isHovered={isH('pwr-led-2')}
-        isSelected={isS('pwr-led-2')}
-        onHover={onHover}
-        onUnhover={onUnhover}
-        onSelect={onSelect}
-      />
-
-      {/* REF IN BNC Connector with Hex Nut (Photo 1 Verified) */}
-      <BncConnector
-        id="ref-in"
-        position={[-0.15, -0.30, halfD + 0.01]}
-        rotation={[0, 0, 0]}
-        hasHexNut={true}
-        isHovered={isH('ref-in')}
-        isSelected={isS('ref-in')}
-        onHover={onHover}
-        onUnhover={onUnhover}
-        onSelect={onSelect}
-      />
 
       {/* ============================================================== */}
       {/* 5. MIO-BLADE-Z21 MICROSERVICE MODULE (UPPER MODULAR BAY)       */}
       {/* ============================================================== */}
-      <group position={[2.45, -0.05, halfD + 0.01]}>
+      <group ref={bladeRef} position={[2.45, -0.05, halfD + 0.01]}>
         {/* Silver Brushed Faceplate */}
         <mesh
           position={[0, 0, 0]}
@@ -876,7 +993,7 @@ export default function EquipmentModel({
       {/* ============================================================== */}
       {/* 6. MIO-VB-2-12G VIDEO ACCESS MODULE (LOWER-LEFT MODULAR BAY)   */}
       {/* ============================================================== */}
-      <group position={[1.55, -0.80, halfD + 0.01]}>
+      <group ref={vbRef} position={[1.55, -0.80, halfD + 0.01]}>
         {/* Silver Faceplate */}
         <mesh
           position={[0, 0, 0]}
@@ -927,7 +1044,7 @@ export default function EquipmentModel({
       {/* ============================================================== */}
       {/* 7. MIO-GE-RJ45-IP ETHERNET MODULE (LOWER-RIGHT MODULAR BAY)    */}
       {/* ============================================================== */}
-      <group position={[3.37, -0.80, halfD + 0.01]}>
+      <group ref={geRef} position={[3.37, -0.80, halfD + 0.01]}>
         {/* Silver Faceplate */}
         <mesh
           position={[0, 0, 0]}
@@ -989,7 +1106,7 @@ export default function EquipmentModel({
       {/* ============================================================== */}
       {/* 8. REAR PANEL (UNVERIFIED PHYSICAL CONNECTOR ARRANGEMENT)      */}
       {/* ============================================================== */}
-      <group position={[0, chassisCenterY, -halfD - 0.005]}>
+      <group ref={rearRef} position={[0, chassisCenterY, -halfD - 0.005]}>
         {/* Rear Faceplate with Unverified Layout Notice */}
         <mesh rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[chassisWidth, chassisBodyHeight]} />

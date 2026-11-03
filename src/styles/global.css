@@ -662,24 +662,46 @@ html, body {
   position: relative;
   background-color: #D8D8D3;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: viewer;
 }
 
-/* Floating View Presets HUD */
-.viewer-hud-presets {
+/* Unified Top Viewer Toolbar (Separated Left Presets & Right Actions) */
+.viewer-top-toolbar {
   position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Left Group: Camera Presets Navigation */
+.toolbar-presets-group {
+  pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(16, 16, 16, 0.92);
+  gap: 3px;
+  background: rgba(16, 16, 16, 0.94);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   border-radius: 5px;
   padding: 3px;
-  z-index: 10;
   box-shadow: var(--shadow-md);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.toolbar-presets-group::-webkit-scrollbar {
+  display: none;
 }
 
 .hud-btn {
@@ -696,6 +718,7 @@ html, body {
   cursor: pointer;
   transition: all 0.12s ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hud-btn:hover {
@@ -710,21 +733,72 @@ html, body {
   font-weight: 700;
 }
 
-/* Floating Tools HUD */
-.viewer-hud-tools {
-  position: absolute;
-  top: 14px;
-  right: 14px;
+/* Right Group: Viewer Action Controls */
+.toolbar-actions-group {
+  pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(16, 16, 16, 0.92);
+  gap: 5px;
+  background: rgba(16, 16, 16, 0.94);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   border-radius: 5px;
-  padding: 4px;
-  z-index: 10;
+  padding: 3px;
   box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+/* Responsive Top Toolbar based on actual 3D Viewer Container Width */
+@container viewer (max-width: 860px) {
+  .hud-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+}
+
+@container viewer (max-width: 700px) {
+  .viewer-top-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .toolbar-presets-group {
+    order: 1;
+    max-width: 100%;
+  }
+
+  .toolbar-actions-group {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .exploded-floating-banner {
+    top: 92px;
+  }
+
+  .cad-labels-column {
+    top: 140px;
+  }
+}
+
+@container viewer (max-width: 480px) {
+  .hud-btn {
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  .tool-btn {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .hud-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
 }
 
 .tool-btn {
@@ -797,6 +871,272 @@ html, body {
   color: #555550;
   pointer-events: none;
   letter-spacing: 0.5px;
+}
+
+/* Exploded View Mode Toolbar Button Highlight */
+.tool-btn.exploded-tool-btn.active {
+  background: var(--accent-yellow);
+  color: var(--text-inverse);
+  box-shadow: 0 0 10px rgba(255, 213, 0, 0.4);
+}
+
+/* Floating Assemble Control Banner */
+.exploded-floating-banner {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(14, 14, 15, 0.94);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--accent-yellow);
+  border-radius: 6px;
+  padding: 6px 14px;
+  z-index: 10;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65), 0 0 14px rgba(255, 213, 0, 0.22);
+  animation: bannerFadeDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bannerFadeDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.exploded-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exploded-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-yellow);
+  box-shadow: 0 0 8px var(--accent-yellow);
+  animation: explodedPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes explodedPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+.exploded-banner-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-yellow);
+  letter-spacing: 0.6px;
+}
+
+.exploded-banner-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--border-color);
+  padding-left: 8px;
+  letter-spacing: 0.2px;
+}
+
+.exploded-assemble-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-yellow);
+  color: var(--text-inverse);
+  border: 1px solid var(--accent-yellow);
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.exploded-assemble-action-btn:hover {
+  background: var(--accent-yellow-hover);
+  border-color: var(--accent-yellow-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(255, 213, 0, 0.45);
+}
+
+.exploded-assemble-action-btn:active {
+  transform: translateY(0);
+}
+
+/* Exploded Floating Banner Actions */
+.exploded-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exploded-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.exploded-action-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+
+.exploded-action-btn.active {
+  background: rgba(255, 213, 0, 0.15);
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+  font-weight: 700;
+}
+
+/* CAD Perimeter Callout Overlay */
+.cad-perimeter-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 8;
+}
+
+/* Outer Perimeter Columns (Docked safely outside the central equipment) */
+.cad-labels-column {
+  position: absolute;
+  top: 105px;
+  bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  pointer-events: none;
+  z-index: 9;
+}
+
+.cad-labels-column.left-column {
+  left: 18px;
+  align-items: flex-start;
+}
+
+.cad-labels-column.right-column {
+  right: 18px;
+  align-items: flex-end;
+}
+
+/* Compact CAD Perimeter Pill */
+.cad-perimeter-pill {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 14, 16, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 213, 0, 0.45);
+  border-radius: 4px;
+  padding: 4px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 6px rgba(255, 213, 0, 0.08);
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.cad-perimeter-pill:hover,
+.cad-perimeter-pill.hovered {
+  border-color: var(--accent-yellow);
+  background: rgba(22, 22, 25, 0.98);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), 0 0 10px rgba(255, 213, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.cad-perimeter-pill.selected {
+  border-color: var(--accent-yellow);
+  background: rgba(26, 26, 30, 0.98);
+  box-shadow: 0 0 0 1px var(--accent-yellow), 0 4px 14px rgba(0, 0, 0, 0.7), 0 0 12px rgba(255, 213, 0, 0.35);
+}
+
+.cad-pill-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-yellow);
+  flex-shrink: 0;
+}
+
+.cad-pill-indicator.unverified-dot {
+  background: #f59e0b;
+}
+
+.cad-perimeter-pill.unverified {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.cad-perimeter-pill.unverified:hover,
+.cad-perimeter-pill.unverified.hovered {
+  border-color: #f59e0b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), 0 0 10px rgba(245, 158, 11, 0.25);
+}
+
+.cad-pill-text {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #d1d5db;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cad-perimeter-pill:hover .cad-pill-text,
+.cad-perimeter-pill.hovered .cad-pill-text {
+  color: #ffffff;
+}
+
+.cad-perimeter-pill.selected .cad-pill-text {
+  color: var(--accent-yellow);
+  font-weight: 700;
+}
+
+/* SVG Leader Lines Layer */
+.cad-leader-lines-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 7;
+  overflow: visible;
 }
 
 /* ==========================================================================

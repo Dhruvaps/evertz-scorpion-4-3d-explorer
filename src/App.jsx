@@ -13,6 +13,7 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeView, setActiveView] = useState('iso');
   const [isRefModalOpen, setIsRefModalOpen] = useState(false);
+  const [exploded, setExploded] = useState(false);
 
   // Handle pointer hover from 3D canvas or sidebar
   const handleHover = useCallback((id, event) => {
@@ -51,6 +52,7 @@ export default function App() {
         case 'Escape':
           setSelectedId(null);
           setIsRefModalOpen(false);
+          setExploded(false);
           break;
         case '1':
           setActiveView('iso');
@@ -67,9 +69,14 @@ export default function App() {
         case '5':
           setActiveView('top');
           break;
+        case 'e':
+        case 'E':
+          setExploded((prev) => !prev);
+          break;
         case 'r':
         case 'R':
           setActiveView('iso');
+          setExploded(false);
           break;
         default:
           break;
@@ -86,7 +93,10 @@ export default function App() {
       <Header
         activeView={activeView}
         onViewChange={setActiveView}
-        onResetView={() => setActiveView('iso')}
+        onResetView={() => {
+          setActiveView('iso');
+          setExploded(false);
+        }}
         onOpenReferences={() => setIsRefModalOpen(true)}
       />
 
@@ -110,6 +120,8 @@ export default function App() {
           onSelect={handleSelect}
           activeView={activeView}
           onViewChange={setActiveView}
+          exploded={exploded}
+          onExplodedChange={setExploded}
         />
 
         {/* Right Column: Selected Component Engineering Details */}
@@ -121,8 +133,8 @@ export default function App() {
         />
       </main>
 
-      {/* Floating 3D Hover Tooltip */}
-      <Tooltip hoveredId={hoveredId} mousePos={mousePos} />
+      {/* Floating 3D Hover Tooltip (Disabled in exploded mode to prevent obscuring hardware) */}
+      <Tooltip hoveredId={hoveredId} mousePos={mousePos} disabled={exploded} />
 
       {/* Reference Photographs Inspector Modal */}
       <ReferenceModal

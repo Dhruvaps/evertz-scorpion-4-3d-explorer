@@ -1,7 +1,7 @@
 import { COMPONENTS_DATA } from '../data/components';
 
-export default function Tooltip({ hoveredId, mousePos }) {
-  if (!hoveredId || !COMPONENTS_DATA[hoveredId]) return null;
+export default function Tooltip({ hoveredId, mousePos, disabled = false }) {
+  if (disabled || !hoveredId || !COMPONENTS_DATA[hoveredId]) return null;
 
   const component = COMPONENTS_DATA[hoveredId];
 
